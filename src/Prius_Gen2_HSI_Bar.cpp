@@ -26,10 +26,7 @@
 
 #include <SoftwareSerial.h>
 #include <LiquidCrystal.h>
-//#include "mcp2515/mcp2515.h"
 #include "CAN/mcp_can.h"
-
-
 
 /* LCD definitions */
 const int rsLCD = A0, enLCD = A1, d4LCD = A2, d5LCD = A3, d6LCD = A4, d7LCD = A5;
@@ -43,7 +40,7 @@ int contrastPin = 9;
 #define DM_INJECTOR_RPM        2 // AAAA  TTT  RRRRE
 #define DM_MAX                 2
 
-/* CAN BUS speed definitions */
+/* CAN BUS definitions */
 #define CAN_125 	7		// CAN speed to 125 kbps
 #define CAN_250  	3		// 250 kbps speed CAN
 #define CAN_500		1		// the speed CAN 500 kbps
@@ -253,8 +250,8 @@ void setup()
     digitalWrite(LED2, LOW);
     digitalWrite(LED3, LOW);
 
-    /* Joystick setup */
-    pinMode(UP,INPUT);
+    /* Joystick setup - TODO */
+    /*pinMode(UP,INPUT);
     pinMode(DOWN,INPUT);
     pinMode(LEFT,INPUT);
     pinMode(RIGHT,INPUT);
@@ -263,7 +260,7 @@ void setup()
     digitalWrite(DOWN, HIGH);
     digitalWrite(LEFT, HIGH);
     digitalWrite(RIGHT, HIGH);
-    digitalWrite(CLICK, HIGH);
+    digitalWrite(CLICK, HIGH);*/
 
     /* LCD setup */
     pinMode(contrastPin, OUTPUT);

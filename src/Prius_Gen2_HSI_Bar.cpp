@@ -26,12 +26,15 @@
 
 #include <SoftwareSerial.h>
 #include <LiquidCrystal.h>
-#include "mcp2515/mcp2515.h"
+//#include "mcp2515/mcp2515.h"
+#include "CAN/mcp_can.h"
+
 
 
 /* LCD definitions */
-const int rsLCD = 12, enLCD = 11, d4LCD = 5, d5LCD = 4, d6LCD = 3, d7LCD = 2;
+const int rsLCD = A0, enLCD = A1, d4LCD = A2, d5LCD = A3, d6LCD = A4, d7LCD = A5;
 LiquidCrystal sLCD(rsLCD, enLCD, d4LCD, d5LCD, d6LCD, d7LCD);
+int contrastPin = 9;
 
 /* LCD DIM modes - TODO */
 #define DM_MIN                 0
@@ -44,6 +47,7 @@ LiquidCrystal sLCD(rsLCD, enLCD, d4LCD, d5LCD, d6LCD, d7LCD);
 #define CAN_125 	7		// CAN speed to 125 kbps
 #define CAN_250  	3		// 250 kbps speed CAN
 #define CAN_500		1		// the speed CAN 500 kbps
+MCP_CAN CAN(10);            // Set CS to pin 10
 
 /* Joystick pin definitions */
 #define UP     A1
@@ -85,9 +89,9 @@ int mpg = 0;
 int injectorTiming = 0;
 
 /* variables for Bar */
-int R=0;
-int E=0;
-int P=0;
+int R = 0;
+int E = 0;
+int P = 0;
 
 /* points of initial variables bar */
 int pointA = 20;
@@ -121,7 +125,7 @@ int value;
 long value2;
 float floatValue;
 int timeout = 0;
-tCAN message;
+//tCAN message;
 
 /* programming of special characters to build the bar */
 byte E0[8] = {   
@@ -262,6 +266,9 @@ void setup()
     digitalWrite(CLICK, HIGH);
 
     /* LCD setup */
+    pinMode(contrastPin, OUTPUT);
+    analogWrite(contrastPin, 120);
+
     sLCD.clear();
     sLCD.begin(16, 2);
     sLCD.print("   HSI Ver.01   ");
@@ -2129,7 +2136,7 @@ void ecu_3(int *data)
     message_ok10 = false;
     message_ok11 = false;
 
-    tCAN sendMessage;
+    //MCP_CAN sendMessage;
 
     // Request fuel injector timing from the ECU.
     // The notes below are mostly quotes from http://techno-fandom.org/~hobbit/cars/can-split.html
@@ -2162,24 +2169,27 @@ void ecu_3(int *data)
     // How to get fuel injector open-time in milliseconds from the Prius, which I'll post more about the benefits of
     // in a separate thread so people can read it without wading through all the protocol discussion. Basically, we
     // want to send 07 E0 02 21 F3.  Notes continue where we process the reply.
-    sendMessage.id = 0x07E0; // CAN address ID
-    sendMessage.header.rtr = 0; // ?
-    sendMessage.header.length = 8; // Always 8
-    sendMessage.data[0] = 0x02; // OBDII length
-    sendMessage.data[1] = 0x21; // Mode 1
-    sendMessage.data[2] = 0xF3; // PID
-    sendMessage.data[3] = 0x00;
-    sendMessage.data[4] = 0x00;
-    sendMessage.data[5] = 0x00;
-    sendMessage.data[6] = 0x00;
-    sendMessage.data[7] = 0x00;
+    unsigned long messageID = 0x07E0; // CAN address ID
+    byte messageExt = 0;
+    byte messageLength = 8;
+    byte messageData[8];
+    messageData[0] = 0x02; // OBDII length
+    messageData[1] = 0x21; // Mode 1
+    messageData[2] = 0xF3; // PID
+    messageData[3] = 0x00;
+    messageData[4] = 0x00;
+    messageData[5] = 0x00;
+    messageData[6] = 0x00;
+    messageData[7] = 0x00;
 
-    mcp2515_bit_modify(CANCTRL, (1<<REQOP2)|(1<<REQOP1)|(1<<REQOP0), 0);
+    int response = CAN.sendMsgBuf(messageID, messageExt, messageLength, messageData);
+
+    //mcp2515_bit_modify(CANCTRL, (1<<REQOP2)|(1<<REQOP1)|(1<<REQOP0), 0);
 
     // Don't bother requesting ignition timing when the ICE isn't running (rpm 970 or less).
     if(rpm >= 970) 
     {
-        if (mcp2515_send_message(&sendMessage)) 
+        if (response) 
         {
             //   SET(LED2_HIGH);
             //return 1;
@@ -2195,14 +2205,16 @@ void ecu_3(int *data)
     while(timeout < 8000)
     {
         timeout++;
-        if (mcp2515_check_message())
+        if (CAN.checkReceive())
         {
             // See http://www.vassfamily.net/ToyotaPrius/CAN/PriusCodes.xls‎ which describes the message.id values
             // (ID column of xls file) that we receive on the CAN bus without requesting them in particular (thus
             // why this code doesn't call mcp2515_send_message to request a particular PID).
             // See also https://github.com/ilduganov/priidash/blob/master/source/CANmsg.cpp for how priidash uses
             // various values.
-            if (mcp2515_get_message(&message))
+            byte recLenght;
+            byte recData[8];
+            if (CAN.readMsgBuf(&recLenght, recData))
             {
                 // Fuel injector timing
                 // We'll get back 07 E8 06 61 F3 xx yy zz qq -- see why? Six bytes of return data
@@ -2221,22 +2233,22 @@ void ecu_3(int *data)
                 // 1280rpm: xxyy=17b5 zz=2b = 43/8 = 5.375ms
                 // 1312rpm:      0908    13 = 19/8 = 2.375ms  I think this is when I pressed the pedal so it's odd the value went down
                 // 1312rpm:      1a29    31 = 49/8 = 6.125ms
-                if(  (message.id == 0x07E8)
-                  && (message.data[0] == 0x06)
-                  && (message.data[1] == 0x61)
-                  && (message.data[2] == 0xF3)
+                if(  (CAN.getCanId() == 0x07E8)
+                  && (recData[0] == 0x06)
+                  && (recData[1] == 0x61)
+                  && (recData[2] == 0xF3)
                   && (!message_ok11) 
                   )
                 {
                     if(debug == 4) 
                     {
                         sLCD.setCursor(0,0);
-                        sprintf(buffer,"%02x%02x%02x%02x%02x%02x%02x ", (int)message.data[0], (int)message.data[1],
-                                (int)message.data[2], (int)message.data[3], (int)message.data[4], (int)message.data[5],
-                                (int)message.data[6]);
+                        sprintf(buffer,"%02x%02x%02x%02x%02x%02x%02x ", (int)recData[0], (int)recData[1],
+                                (int)recData[2], (int)recData[3], (int)recData[4], (int)recData[5],
+                                (int)recData[6]);
                         sLCD.print(buffer);
                     }
-                    data[11] =  message.data[5];
+                    data[11] =  recData[5];
                     message_ok11 = true ;
                 }
 
@@ -2250,35 +2262,35 @@ void ecu_3(int *data)
                 // 7-positionspeed
                 // change in position 8
                 // at position 9 SOC
-                if((message.id == 0x52C && !message_ok1) )	// Check the ID of temperature
+                if((CAN.getCanId() == 0x52C && !message_ok1) )	// Check the ID of temperature
                 {
-                    data[1] =  (message.data[1]) / 2 ; // convert to degrees C
+                    data[1] =  (recData[1]) / 2 ; // convert to degrees C
                     message_ok1 = true ;
                 }
 
-                if((message.id == 0x529 && !message_ok0) )	// Check the ID of EV mode
+                if((CAN.getCanId() == 0x529 && !message_ok0) )	// Check the ID of EV mode
                 {
-                    data[0] = message.data[4] ;
+                    data[0] = recData[4] ;
                     message_ok0 = true;
                 }
 
-                if((message.id == 0x57F && !message_ok2) )	// Check ID brightness
+                if((CAN.getCanId() == 0x57F && !message_ok2) )	// Check ID brightness
                 {
-                    data[2] = message.data[2] ;
+                    data[2] = recData[2] ;
                     message_ok2 = true;
                 }
 
-                if((message.id == 0x3C8 && !message_ok3) )	// Check the ID of RPM
+                if((CAN.getCanId() == 0x3C8 && !message_ok3) )	// Check the ID of RPM
                 {
-                    value2 =  ((message.data[2]*256) + message.data[3]) / 8 ;  // convert to RPM
+                    value2 =  ((recData[2]*256) + recData[3]) / 8 ;  // convert to RPM
                     data[3] = value2;
                     //rpm = value2;
                     message_ok3 = true;
                 }
 
-                if((message.id == 0x3B && !message_ok4) )	// Check the ID of the current from the battery
+                if((CAN.getCanId() == 0x3B && !message_ok4) )	// Check the ID of the current from the battery
                 {
-                    value = ((message.data[0]) * 256) + (message.data[1]);   // put the two bytes
+                    value = ((recData[0]) * 256) + (recData[1]);   // put the two bytes
                     if ( (value & 0x800) != 0 )
                     {
                         value = value - 0x1000;
@@ -2287,22 +2299,22 @@ void ecu_3(int *data)
                     message_ok4 = true;
                 }
 
-                if((message.id == 0x244 && !message_ok5) )	// Check the ID of the accelerator pedal position
+                if((CAN.getCanId() == 0x244 && !message_ok5) )	// Check the ID of the accelerator pedal position
                 {
-                    data[5] =  message.data[6];  // 0 to 200
+                    data[5] =  recData[6];  // 0 to 200
                     message_ok5 = true;
                 }
 
-                if((message.id == 0x30 && !message_ok6) )	// Check the ID of the brake pedal position
+                if((CAN.getCanId() == 0x30 && !message_ok6) )	// Check the ID of the brake pedal position
                 {
-                    floatValue =  ((message.data[4] * 100) / 127);  // turn in%
+                    floatValue =  ((recData[4] * 100) / 127);  // turn in%
                     data[6] = floatValue;
                     message_ok6 = true;
                 }
 
-                if((message.id == 0xB4 && !message_ok7) )	// Check the ID of the speed
+                if((CAN.getCanId() == 0xB4 && !message_ok7) )	// Check the ID of the speed
                 {
-                    value2 = ( message.data[5] << 8) | (message.data[6]);
+                    value2 = ( recData[5] << 8) | (recData[6]);
                     value2 = ((value2 * 10) / 1024);
                     data[7] = value2;
                     //kph = value2;
@@ -2311,21 +2323,21 @@ void ecu_3(int *data)
 
                 // Check the ID of Drive Mode (gear shift position in data[5], cruise control on/off data[4], powered or standby data[6])
                 // According to the XLS file we could also use id 0x540.
-                if((message.id == 0x120 && !message_ok8) )
+                if((CAN.getCanId() == 0x120 && !message_ok8) )
                 {
-                    data[8] = (message.data[5]);
+                    data[8] = (recData[5]);
                     message_ok8 = true;
                 }
 
-                if((message.id == 0x3CB && !message_ok9) )	// Check the ID of the State Of Charge
+                if((CAN.getCanId() == 0x3CB && !message_ok9) )	// Check the ID of the State Of Charge
                 {
-                    value2 = ( message.data[2] << 8) | (message.data[3]);
+                    value2 = (recData[2] << 8) | (recData[3]);
                     value2 = (value2 / 2);
                     data[9] = value2;
                     message_ok9 = true;
                 }
 
-                if((message.id == 0x520 && !message_ok10) )	// Check the ID of the MPG (we'll return liters per time unit)
+                if((CAN.getCanId() == 0x520 && !message_ok10) )	// Check the ID of the MPG (we'll return liters per time unit)
                 {
                     // Priidash calls this lps as if to mean liters per second, but it gets values of 250+ on mild acceleration
                     // and 900+ on a mild hill so I don't know what the units actually are.  pridash source uses data[0] and data[1]
@@ -2334,12 +2346,12 @@ void ecu_3(int *data)
                     // a useful value so I don't get it.  I tried a calc using a400 = 41984 as lps to see if it would produce
                     // a reasonable value at 1000 rpm and 15kph but you get 0.48mpg.  Using a reasonable 800 value for lps gets
                     // you 25mpg using priidash's formula.
-                    int lps = message.data[1]*256 + message.data[2];
+                    int lps = recData[1]*256 + recData[2];
 
                     if(debug == 3) 
                     {
                         sLCD.setCursor(0,0);
-                        sprintf(buffer,"%3dL %02x%02x%02x ",(int)lps, (int)message.data[0], (int)message.data[1], (int)message.data[2]);
+                        sprintf(buffer,"%3dL %02x%02x%02x ",(int)lps, (int)recData[0], (int)recData[1], (int)recData[2]);
                         sLCD.print(buffer);
                     }
 
@@ -2356,5 +2368,5 @@ void ecu_3(int *data)
 // function to start the 2515 chip
 char inic(unsigned char speed) 
 {
-    return mcp2515_init(speed);
+    return CAN.begin(speed);
 }

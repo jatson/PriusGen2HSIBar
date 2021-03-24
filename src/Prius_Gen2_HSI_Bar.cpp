@@ -24,14 +24,33 @@
   2021. 03. 20 v0.1 by Barna Zoboki
   */
 
-#include <SoftwareSerial.h>
-#include <LiquidCrystal.h>
 #include "CAN/mcp_can.h"
+#include "Config.h"
 
 /* LCD definitions */
+#if (LCD_1602A == FEAT_AVAILABLE)
+#include <LiquidCrystal.h>
 const int rsLCD = A0, enLCD = A1, d4LCD = A2, d5LCD = A3, d6LCD = A4, d7LCD = A5;
 LiquidCrystal sLCD(rsLCD, enLCD, d4LCD, d5LCD, d6LCD, d7LCD);
-int contrastPin = 9;
+int contrastPin = 8;
+
+#elif (OLED_128x64 == FEAT_AVAILABLE)
+#include <Arduino.h>
+#include <U8g2lib.h>
+
+#if (LCD_CONNECTION_TYPE == CONNECTION_SPI)
+#include <SPI.h>
+#elif (LCD_CONNECTION_TYPE == CONNECTION_I2C)
+#include <Wire.h>
+#else
+#error "LCD connection tpye is not configured, please check your config"
+#endif /* (LCD_CONNECTION_TYPE == CONNECTION_SPI) */
+
+U8G2_SH1106_128X64_NONAME_1_HW_I2C sLCD(U8G2_R0);
+
+#else
+#error "LCD is not configured, please check your config"
+#endif /* (LCD_1602A == FEAT_AVAILABLE) */
 
 /* LCD DIM modes - TODO */
 #define DM_MIN                 0
@@ -44,7 +63,7 @@ int contrastPin = 9;
 #define CAN_125 	7		// CAN speed to 125 kbps
 #define CAN_250  	3		// 250 kbps speed CAN
 #define CAN_500		1		// the speed CAN 500 kbps
-MCP_CAN CAN(10);            // Set CS to pin 10
+MCP_CAN CAN(9);            // Set CS to pin 10
 
 /* Joystick pin definitions */
 #define UP     A1
@@ -53,9 +72,9 @@ MCP_CAN CAN(10);            // Set CS to pin 10
 #define CLICK  A4
 #define LEFT   A5
 
-#define LED2 8    // pins for the leds 2:03
-#define LED3 7
-#define FALTA 10
+#define LED2 7    // pins for the leds 2:03
+#define LED3 6
+#define FALTA 5
 
 /* Gear position states */
 #define GS_PARK 0
@@ -122,7 +141,6 @@ int value;
 long value2;
 float floatValue;
 int timeout = 0;
-//tCAN message;
 
 /* programming of special characters to build the bar */
 byte E0[8] = {   
@@ -215,7 +233,6 @@ byte P8[8] = {
 byte P9[8] = { 
     B00011111, B00011101, B00011101, B00011101, B00011111, B00000000, B00000000, B00000000           };
 
-
 /* Timers */
 unsigned long time1 = 0;
 // unsigned long time2 = 0,
@@ -244,11 +261,11 @@ void drawbar_P (int p);
 
 void setup() 
 {
-    /* LED setup */
-    pinMode(LED2, OUTPUT);
+    /* LED setup - Turned off for now */
+    /*pinMode(LED2, OUTPUT);
     pinMode(LED3, OUTPUT);
     digitalWrite(LED2, LOW);
-    digitalWrite(LED3, LOW);
+    digitalWrite(LED3, LOW);*/
 
     /* Joystick setup - TODO */
     /*pinMode(UP,INPUT);
@@ -262,19 +279,29 @@ void setup()
     digitalWrite(RIGHT, HIGH);
     digitalWrite(CLICK, HIGH);*/
 
+#if (LCD_1602A == FEAT_AVAILABLE)
     /* LCD setup */
     pinMode(contrastPin, OUTPUT);
-    analogWrite(contrastPin, 120);
+    analogWrite(contrastPin, 100);
+#endif /* (LCD_1602A == FEAT_AVAILABLE)*/
 
     sLCD.clear();
+#if (LCD_1602A == FEAT_AVAILABLE)
     sLCD.begin(16, 2);
-    sLCD.print("   HSI Ver.01   ");
+#endif
+
+#if (OLED_128x64 == FEAT_AVAILABLE)
+    sLCD.begin();
+#endif
+    sLCD.setFont(u8g2_font_ncenB14_tr);
+    sLCD.setCursor(0, 15);
+    sLCD.print("HSI Ver.01");
     sLCD.setCursor(0,1);
     sLCD.print("   WELCOME!     ");
     delay (1000);
 
     /* Initialize the MCP2515 CAN controller to the selected speed, 500 for the Prius */
-    if(inic(CAN_500))
+    if(inic(CAN_500) == CAN_OK)
     {
         sLCD.clear();
         sLCD.setCursor(0,0);
@@ -293,7 +320,7 @@ void setup()
         delay (10000);
     }
 
-    delay(1000);
+    delay(10000);
     sLCD.clear();
     clear_hsi();
 }
@@ -2115,7 +2142,7 @@ void drawbar_P (int p)
 void ecu_3(int *data)
 {
     timeout = 0;
-    for (count=0;count<=11;count++)
+    for (count = 0; count <= 11; count++)
     {
         data[count]=9999;
     }
@@ -2166,7 +2193,7 @@ void ecu_3(int *data)
     // How to get fuel injector open-time in milliseconds from the Prius, which I'll post more about the benefits of
     // in a separate thread so people can read it without wading through all the protocol discussion. Basically, we
     // want to send 07 E0 02 21 F3.  Notes continue where we process the reply.
-    unsigned long messageID = 0x07E0; // CAN address ID
+    /*unsigned long messageID = 0x07E0; // CAN address ID
     byte messageExt = 0;
     byte messageLength = 8;
     byte messageData[8];
@@ -2195,7 +2222,7 @@ void ecu_3(int *data)
         {
             //   PRINT("Fehler: konnte die Nachricht nicht auslesen\n\n");
         }
-    }
+    }*/
 
     //mcp2515_bit_modify(CANCTRL, (1<<REQOP2)|(1<<REQOP1)|(1<<REQOP0), 0);
 

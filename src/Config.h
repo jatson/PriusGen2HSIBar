@@ -1,3 +1,6 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
 /* Basic defines here */
 #define FEAT_AVAILABLE (1)
 #define FEAT_NOT_AVAILABLE (0)
@@ -13,3 +16,5 @@
 
 /* LCD 1602 display */
 #define LCD_1602A FEAT_NOT_AVAILABLE
+
+#endif /* CONFIG_H */

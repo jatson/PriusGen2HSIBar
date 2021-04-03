@@ -28,7 +28,7 @@ int contrastPin = 8;
 #endif /* (LCD_1602A == FEAT_AVAILABLE) */
 
 /* LCD DIM modes - TODO */
-#define DM_MIN 0
+#define -DM_MIN 0
 #define DM_INJECTOR_MPG 0 // AAAA  TTT  MMM E
 #define DM_TEMP_RPM 1     // AAAA  CCC  RRRRE
 #define DM_INJECTOR_RPM 2 // AAAA  TTT  RRRRE
@@ -50,14 +50,15 @@ private:
     uint8_t m_hsiHeight;
 
     void drawPwrBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent);
-    void drawMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent);
+    void drawRegenMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent);
+    void drawAccelMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent);
     void drawChgBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent);
 
 public:
     displayHandler(const u8g2_cb_t *rotation = U8G2_R0, uint8_t reset = U8X8_PIN_NONE, uint8_t clock = U8X8_PIN_NONE, uint8_t data = U8X8_PIN_NONE);
     ~displayHandler();
 
-    void drawHsi(int8_t chgPercent = 0, int8_t mainPercent = 0, int8_t pwrPercent = 0);
+    void drawHsi(int8_t chgPercent = 0, int8_t mainRegenPercent = 0, int8_t mainAccelPercent = 0, int8_t pwrPercent = 0);
     void welcomeMessage();
     void writeOnDisplay(const String &toWrite);
 } DisplayHandler;

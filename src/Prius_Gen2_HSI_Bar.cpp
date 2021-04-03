@@ -24,7 +24,7 @@
   2021. 03. 20 v0.1 by Barna Zoboki
   */
 
-#include "CAN/mcp_can.h"
+#include "CAN/mcp2515_can.h"
 #include "Config.h"
 #include "DisplayHandler.h"
 
@@ -35,7 +35,7 @@ DisplayHandler sLCD;
 #define CAN_125 7 // CAN speed to 125 kbps
 #define CAN_250 3 // 250 kbps speed CAN
 #define CAN_500 1 // the speed CAN 500 kbps
-MCP_CAN CAN(9);   // Set CS to pin 10
+mcp2515_can CAN(9);   // Set CS to pin 10
 
 /* Joystick pin definitions */
 #define UP A1
@@ -2029,7 +2029,7 @@ void drawbar_P(int p)
 }
 
 /* Reading data from CAN */
-void ecu_3(int *data)
+void readDataFromCAN(int *data)
 {
     timeout = 0;
     for (count = 0; count <= 11; count++)

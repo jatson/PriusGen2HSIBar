@@ -17,7 +17,6 @@ DisplayHandler::displayHandler(const u8g2_cb_t *rotation = U8G2_R0, uint8_t rese
 
     m_lcd.clear();
     m_lcd.begin();
-
     m_lcd.setFont(u8g2_font_ncenB08_tr);
 }
 
@@ -33,10 +32,11 @@ DisplayHandler::~displayHandler()
  * Negative values will start filling the bar from right to left
  * 
  * @param chgPercent Filling percentage of CHG bar
- * @param mainPercent Filling percentage of the main bar
+ * @param mainRegenPercent Filling percentage of the regen bar
+ * @param mainAccelPercent Filling percentage of the acceleration bar
  * @param pwrPercent Filling percentage of the PWR bar
  */
-void DisplayHandler::drawHsi(int8_t chgPercent = 0, int8_t mainPercent = 0, int8_t pwrPercent = 0)
+void DisplayHandler::drawHsi(int8_t chgPercent = 0, int8_t mainRegenPercent = 0, int8_t mainAccelPercent = 0, int8_t pwrPercent = 0)
 {
     uint8_t smallBarWidth = m_hsiWidth / 4;
     uint8_t smallBarHeight = m_hsiHeight / 2;
@@ -44,19 +44,22 @@ void DisplayHandler::drawHsi(int8_t chgPercent = 0, int8_t mainPercent = 0, int8
     uint8_t chgX = m_hsiX;
     uint8_t chgY = m_hsiY + smallBarHeight;
 
-    uint8_t mainWidth = m_hsiWidth / 2;
     uint8_t mainHeight = m_hsiHeight;
-    uint8_t mainX = m_hsiX + smallBarWidth - 1;
     uint8_t mainY = m_hsiY;
-
-    uint8_t pwrX = mainX + mainWidth - 1;
+    uint8_t mainWidth = m_hsiWidth / 4;
+    
+    uint8_t mainRegenX = m_hsiX + smallBarWidth - 1;
+    uint8_t mainAccX = mainRegenX + mainWidth - 1;
+    
+    uint8_t pwrX = mainAccX + mainWidth - 1;
     uint8_t pwrY = mainY;
 
     m_lcd.firstPage();
     do
     {
         drawChgBar(chgX, chgY, smallBarWidth, smallBarHeight, chgPercent);
-        drawMainBar(mainX, mainY, mainWidth, mainHeight, mainPercent);
+        drawRegenMainBar(mainRegenX, mainY, mainWidth, mainHeight, mainRegenPercent);
+        drawAccelMainBar(mainAccX, mainY, mainWidth, mainHeight, mainAccelPercent);
         drawPwrBar(pwrX, pwrY, smallBarWidth, smallBarHeight, pwrPercent);
     } while (m_lcd.nextPage());
 }
@@ -82,7 +85,28 @@ void DisplayHandler::drawPwrBar(uint8_t x, uint8_t y, uint8_t width, uint8_t hei
     }
 }
 
-void DisplayHandler::drawMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent = 0)
+void DisplayHandler::drawRegenMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent = 0)
+{
+    m_lcd.drawFrame(x, y, width, height); /* main bar */
+
+    if (percent < 0)
+    {
+        uint8_t barX = (x + width) - (((float)width * abs(percent)) / 100.0);
+        uint8_t barWidth = x + width - barX;
+        m_lcd.drawBox(barX, y, barWidth, height);
+    }
+    else if (percent > 0)
+    {
+        uint8_t barWidth = (((float)width * percent) / 100.0);
+        m_lcd.drawBox(x, y, barWidth, height);
+    }
+    else
+    {
+        /* nothing to do here */
+    }
+}
+
+void DisplayHandler::drawAccelMainBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, int8_t percent = 0)
 {
     m_lcd.drawFrame(x, y, width, height); /* main bar */
 
@@ -139,7 +163,7 @@ void DisplayHandler::welcomeMessage()
 
 void DisplayHandler::writeOnDisplay(const String &toWrite)
 {
-    sLCD.clear();
+    m_lcd.clear();
     m_lcd.firstPage();
     do
     {

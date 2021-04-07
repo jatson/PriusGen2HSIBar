@@ -1,26 +1,7 @@
 /* Project HSI bar for Prius 2G
   Requires the CAN-bus shield for Arduino.
-  The data are displayed on the LCD Serial
+  The data are displayed on OLED I2C 12x64 display
   
-  4-22-14 v1.091 updates by Chris Dragon:
-  Added MPG and fuel injection timing displays.
-  Added ability to toggle between showing amps and fuel injection or MPG and coolant temp using left and right d-pad on Sparkfun CAN-Bus.
-  Added debug modes 1 through 4 accessible by pressing up on d-pad.
-  Press center d-pad to clear display and reset debug and MPG display to default.
-  English translation of source code.
-  Modified to work in Arduino IDE 1.0.5.
-  Fixed gearShift values to work with more cars (including my own).
-  Limit redrawing amps more than once every 500ms to prevent fast flickering that makes the number unreadable.
-  Negative engine RPMs are now displayed as positive followed by B for engine brake.  Hitting negative RPMs seems to only happen on an extended steep hill.
-  
-  4-24-14 v1.092
-  Changed single letter 'R' after RPM to 'G' for Gas.  Added 'C' for Combined when both gas and electric are running.
-  Replaced RPM on default displayMode with MPG, leaving single letter to indicate electric, ICE, or combined.
-  Added displayMode DM_INJECTOR_RPM.
-  Changing displayMode now clears screen so you can be sure the mode changed when the car is not sending many
-  display updates.
-  Fixed displayMode > 0 to update battery amps.
-
   2021. 03. 20 v0.1 by Barna Zoboki
   */
 
@@ -324,7 +305,8 @@ void loop()
             if (flag == 0) // if it is still connected and warns off
             {
                 sLCD.clear();
-                sLCD.writeOnDisplay("No signal. Hibernating...");
+                sLCD.writeOnDisplay("No signal");
+                sLCD.writeOnDisplay("Hibernating...", 30);
 
                 /* Dimming LCD - TODO */
                 //sLCD.write((uint8_t)DIM);
